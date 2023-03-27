@@ -18,7 +18,7 @@ export default class Sketch {
     this.container = document.getElementById('container');
     this.width = this.container.offsetWidth;
     this.height = this.container.offsetHeight;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(this.width, this.height);
     // this.renderer.setClearColor(0xeeeeee, 1);
@@ -114,29 +114,57 @@ export default class Sketch {
     this.blobs = [];
     let number = 50;
     let newBlob = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.1, 0.1),
+      new THREE.PlaneGeometry(0.3, 0.3),
       new THREE.MeshBasicMaterial({
         map: new THREE.TextureLoader().load(blob),
         transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false,
+        opacity: 1,
       })
     );
     newBlob.position.z = 0.1;
 
-    this.scene.add(newBlob);
-
     for (let i = 0; i < number; i++) {
       let blob = newBlob.clone();
       let angle = range(0, 2 * Math.PI);
-      let radius = range(0.1, 0.4);
+      let radius = range(0.1, 0.2);
       blob.position.x = Math.sin(angle) * radius;
       blob.position.y = Math.cos(angle) * radius;
+      blob.userData.life = range(-2 * Math.PI, 2 * Math.PI);
 
       this.blobs.push(blob);
-      this.scene.add(blob);
+      this.scene2.add(blob);
     }
   }
 
+  updateBlobs() {
+    this.blobs.forEach((blob) => {
+      blob.userData.life += 0.1;
+      blob.scale.setScalar(Math.sin(blob.userData.life * 0.5));
+
+      if (blob.userData.life > 2 * Math.PI) {
+        // Blobs dissapear
+        blob.userData.life = -2 * Math.PI;
+
+        let angle = range(0, 2 * Math.PI);
+        let radius = range(0.05, 0.14);
+
+        blob.position.x = this.point.x + Math.sin(angle) * radius;
+        blob.position.y = this.point.y + Math.cos(angle) * radius;
+      }
+
+      // reset life
+    });
+  }
+
   addMesh() {
+    const video1 = document.getElementById('video1');
+    video1.play();
+    const video2 = document.getElementById('video2');
+    video2.play();
+
     this.material = new THREE.ShaderMaterial({
       extensions: {
         derivatives: '#extension GL_OES_standard_derivatives : enable',
@@ -144,7 +172,8 @@ export default class Sketch {
       uniforms: {
         time: { value: 0 },
         resolution: { value: new THREE.Vector4() },
-        bg: { value: new THREE.TextureLoader().load(image1) },
+        // bg: { value: new THREE.TextureLoader().load(image1) },
+        bg: { value: new THREE.VideoTexture(video1) },
         mask: { value: new THREE.TextureLoader().load(blob) },
       },
       fragmentShader: fragment,
@@ -159,9 +188,10 @@ export default class Sketch {
     this.plane.position.z = 0.1;
 
     let bgMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.6, 1),
+      new THREE.PlaneGeometry(2.2, 1),
       new THREE.MeshBasicMaterial({
-        map: new THREE.TextureLoader().load(image2),
+        map: new THREE.VideoTexture(video2),
+        resolution: { value: new THREE.Vector4() },
       })
     );
 
@@ -172,6 +202,13 @@ export default class Sketch {
   render() {
     this.time += 0.05;
     this.material.uniforms.time.value = this.time;
+    // Render blobs
+    this.updateBlobs();
+    this.renderer.setRenderTarget(this.renderTarget);
+    this.renderer.render(this.scene2, this.camera);
+    this.material.uniforms.mask.value = this.renderTarget.texture;
+    this.renderer.setRenderTarget(null);
+
     // console.log(this.point.x);
     this.renderer.render(this.scene, this.camera);
     window.requestAnimationFrame(this.render.bind(this));
