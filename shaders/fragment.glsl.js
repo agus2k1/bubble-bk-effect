@@ -7,12 +7,19 @@ const fragmentShader = `
     void main() {
         vec2 newUV = (vUv - vec2(0.5)) * resolution.zw + vec2(0.5);
 
-        vec4 t = texture2D(bg, newUV);
-        vec4 myMask = texture2D(mask, newUV);
+        vec4 myMask = texture2D(mask, vUv);
 
-        gl_FragColor = t;
+        float strength = myMask.a * myMask.r;
+
+        strength *= 3.;
+
+        strength = min(1., strength); 
+
+        vec4 t = texture2D(bg, newUV + (1. - strength) * 0.1);
+
+        gl_FragColor = t * strength;
         // gl_FragColor = myMask;
-        gl_FragColor.a *= myMask.a;
+        // gl_FragColor.a *= myMask.a;
     }
 `;
 
